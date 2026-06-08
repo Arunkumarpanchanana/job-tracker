@@ -31,6 +31,38 @@
     h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
     .subtitle { color: var(--muted); margin-top: 0; font-size: 0.95rem; }
 
+    .insights-panel {
+      background: var(--card);
+      border: 1px solid var(--accent);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 24px;
+      display: none;
+    }
+    .insights-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .insights-header h3 { margin: 0; font-size: 1.1rem; }
+    .insights-header button {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 0.8rem;
+    }
+    .insights-header button:hover { opacity: 0.85; }
+    .insights-section { font-size: 0.9rem; margin-bottom: 10px; line-height: 1.5; }
+    .insights-section strong { color: var(--accent); }
+    .insights-followups { margin: 8px 0 8px 16px; padding: 0; }
+    .insights-followups li { margin-bottom: 4px; }
+    .insights-recommendation { color: var(--interview); }
+    .insights-loading { font-size: 0.85rem; color: var(--muted); }
+
     .controls {
       display: flex;
       gap: 12px;
@@ -105,13 +137,8 @@
     .status-Unknown { background: var(--muted); color: #000; }
 
     #loading, #error { text-align: center; padding: 40px 0; color: var(--muted); }
-    #error { color: var(--rejected); }
-    .last-updated {
-      text-align: center;
-      font-size: 0.78rem;
-      color: var(--muted);
-      margin-top: 32px;
-    }
+    #error { color: var(--rejected); display: none; }
+    .last-updated { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 32px; }
 
     @media (max-width: 500px) {
       .job-card { flex-direction: column; align-items: flex-start; }
@@ -122,10 +149,24 @@
 <body>
 <div class="container">
   <h1>Job Application Tracker</h1>
-  <p class="subtitle">Synced from Gmail via Google Apps Script</p>
+  <p class="subtitle">Synced from Gmail &bull; Powered by Google Sheets + Gemini AI</p>
+
+  <div class="insights-panel" id="insights-panel">
+    <div class="insights-header">
+      <h3>AI Insights</h3>
+      <button onclick="refreshInsights()">Refresh</button>
+    </div>
+    <div class="insights-section" id="insights-summary"></div>
+    <div class="insights-section" id="insights-followups-section" style="display:none;">
+      <strong>Follow-ups needed:</strong>
+      <ul class="insights-followups" id="insights-followups"></ul>
+    </div>
+    <div class="insights-section insights-recommendation" id="insights-recommendation"></div>
+    <div class="insights-loading" id="insights-loading">Generating insights...</div>
+  </div>
 
   <div class="controls">
-    <input type="text" id="search" placeholder="Search company or subject…" oninput="render()" />
+    <input type="text" id="search" placeholder="Search company or subject..." oninput="render()" />
     <select id="status-filter" onchange="render()">
       <option value="all">All statuses</option>
       <option value="Applied">Applied</option>
@@ -137,9 +178,9 @@
   </div>
 
   <div class="stats-bar" id="stats-bar"></div>
-  <div id="loading">Loading applications…</div>
+  <div id="loading">Loading applications...</div>
   <div id="job-list"></div>
-  <div id="error" style="display:none"></div>
+  <div id="error">Could not load data. Make sure your Apps Script deployment is set to <strong>Anyone</strong>.</div>
   <div class="last-updated" id="last-updated"></div>
 </div>
 
@@ -174,6 +215,12 @@
   function formatDate(val) {
     const d = parseDate(val);
     return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '\u2014';
+  }
+
+  function daysSince(val) {
+    const d = parseDate(val);
+    if (!d) return null;
+    return Math.floor((Date.now() - d.getTime()) / 86400000);
   }
 
   function render() {
@@ -214,10 +261,7 @@
 
     const total = allJobs.length;
     const counts = { Applied: 0, Interview: 0, Assessment: 0, Rejected: 0, Offer: 0 };
-    allJobs.forEach(j => {
-      const s = getVal(j, 'status');
-      if (counts[s] !== undefined) counts[s]++;
-    });
+    allJobs.forEach(j => { const s = getVal(j, 'status'); if (counts[s] !== undefined) counts[s]++; });
     document.getElementById('stats-bar').innerHTML = `
       <span><strong>${total}</strong> total</span>
       <span class="stat-applied"><strong>${counts.Applied}</strong> Applied</span>
@@ -241,17 +285,51 @@
     try { localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data })); } catch {}
   }
 
+  async function loadInsights() {
+    const panel = document.getElementById('insights-panel');
+    const loading = document.getElementById('insights-loading');
+    panel.style.display = 'block';
+    loading.textContent = 'Generating insights...';
+    document.getElementById('insights-summary').innerHTML = '';
+    document.getElementById('insights-followups-section').style.display = 'none';
+    document.getElementById('insights-recommendation').innerHTML = '';
+
+    try {
+      const resp = await fetch(API_URL + '?mode=insights');
+      const data = await resp.json();
+      if (data.error) { loading.textContent = data.error; return; }
+      loading.style.display = 'none';
+      document.getElementById('insights-summary').innerHTML = '<strong>Summary:</strong> ' + data.summary;
+      if (data.followUps && data.followUps.length) {
+        document.getElementById('insights-followups-section').style.display = 'block';
+        document.getElementById('insights-followups').innerHTML = data.followUps.map(f =>
+          '<li><strong>' + f.company + '</strong> (' + f.daysSinceApplied + 'd ago) &mdash; ' + f.suggestion + '</li>'
+        ).join('');
+      }
+      document.getElementById('insights-recommendation').innerHTML = '<strong>Recommendation:</strong> ' + data.recommendation;
+    } catch {
+      loading.textContent = 'Set GEMINI_API_KEY in Script Properties to enable AI insights.';
+    }
+  }
+
+  async function refreshInsights() {
+    const loading = document.getElementById('insights-loading');
+    loading.style.display = 'block';
+    loading.textContent = 'Regenerating insights...';
+    await loadInsights();
+  }
+
   async function fetchJobs() {
     const cached = loadCache();
     if (cached) {
       allJobs = cached;
       render();
-      document.getElementById('last-updated').textContent = 'Showing cached data \u2014 refreshing\u2026';
+      document.getElementById('last-updated').textContent = 'Showing cached data \u2014 refreshing...';
     }
 
     try {
       const resp = await fetch(API_URL);
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
       const data = await resp.json();
 
       allJobs = data.map(j => ({
@@ -272,13 +350,12 @@
       saveCache(allJobs);
       render();
       document.getElementById('loading').style.display = 'none';
-      document.getElementById('last-updated').textContent = `Last synced: ${new Date().toLocaleString()}`;
       document.getElementById('error').style.display = 'none';
+      document.getElementById('last-updated').textContent = 'Last synced: ' + new Date().toLocaleString();
+
+      loadInsights();
     } catch (e) {
-      if (!cached) {
-        document.getElementById('error').style.display = 'block';
-        document.getElementById('error').textContent = 'Could not load data. Make sure your Apps Script deployment is set to Anyone.';
-      }
+      if (!cached) document.getElementById('error').style.display = 'block';
       document.getElementById('loading').style.display = 'none';
     }
   }
