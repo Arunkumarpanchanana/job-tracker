@@ -1,57 +1,109 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>My Job Tracker</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Hunt Dashboard</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glass.css/glass.css">
     <style>
-        .status-Applied { color: orange; }
-        .status-Interview { color: cyan; font-weight: bold; }
-        .status-Rejected { color: gray; }
-        .status-Offer { color: green; font-weight: bold; }
+        body { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: #fff; min-height: 100vh; padding: 20px;
+        }
+        .container { max-width: 900px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 40px; }
+        
+        .job-card {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: transform 0.2s;
+        }
+        .job-card:hover { transform: translateY(-3px); background: rgba(255, 255, 255, 0.15); }
+
+        .job-info { flex: 1; }
+        .job-company { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
+        .job-subject { font-size: 0.9rem; opacity: 0.8; margin-bottom: 10px; }
+        .job-date { font-size: 0.8rem; opacity: 0.6; }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        .status-Applied { background: #3498db; }
+        .status-Interview { background: #f1c40f; color: #000; }
+        .status-Rejected { background: #e74c3c; }
+        .status-Offer { background: #2ecc71; }
+
+        #loading { text-align: center; font-style: italic; }
     </style>
 </head>
 <body>
-    <h1>Live Job Tracker</h1>
-    <div id="loading">Fetching data from Gmail...</div>
-    <table id="job-table" style="display:none;">
-        <thead>
-            <tr>
-                <th>Date</th>
-                <th>Company</th>
-                <th>Status</th>
-                <th>Subject</th>
-            </tr>
-        </thead>
-        <tbody id="table-body"></tbody>
-    </table>
 
-    <script>
-        // PASTE YOUR GOOGLE WEB APP URL HERE
-        const API_URL = "https://script.google.com/macros/s/AKfycbwC-QAzm0D6oyUYDUzFkTjwtsqD9rEf8dg7uGCZtnvxhcKJj9uJtTSXGhcyDJqysEIQ/exec";
+<div class="container">
+    <div class="header">
+        <h1>🚀 Job Application Tracker</h1>
+        <p id="stats">Syncing live from your Gmail...</p>
+    </div>
 
-        async function loadJobs() {
-            try {
-                const response = await fetch(API_URL);
-                const data = await response.json();
-                const tableBody = document.getElementById('table-body');
+    <div id="loading">Scanning your inbox...</div>
+    <div id="job-list"></div>
+</div>
+
+<script>
+    const API_URL = "https://script.google.com/macros/s/AKfycbwC-QAzm0D6oyUYDUzFkTjwtsqD9rEf8dg7uGCZtnvxhcKJj9uJtTSXGhcyDJqysEIQ/exec";
+
+    async function loadJobs() {
+        try {
+            const response = await fetch(API_URL);
+            const data = await response.json();
+            const list = document.getElementById('job-list');
+            const loading = document.getElementById('loading');
+            
+            loading.style.display = 'none';
+            list.innerHTML = '';
+
+            // Sort newest first
+            data.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+
+            data.forEach(job => {
+                const card = document.createElement('div');
+                card.className = 'job-card';
                 
-                data.forEach(job => {
-                    const row = `<tr>
-                        <td>${new Date(job.Date).toLocaleDateString()}</td>
-                        <td>${job.Company}</td>
-                        <td class="status-${job.Status}">${job.Status}</td>
-                        <td>${job.Subject}</td>
-                    </tr>`;
-                    tableBody.innerHTML += row;
-                });
+                const dateClean = new Date(job.Date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('job-table').style.display = 'table';
-            } catch (error) {
-                document.getElementById('loading').innerText = "Error loading data.";
-            }
+                card.innerHTML = `
+                    <div class="job-info">
+                        <div class="job-company">${job.Company || 'Unknown'}</div>
+                        <div class="job-subject">${job.Subject || 'No Subject'}</div>
+                        <div class="job-date">📅 ${dateClean}</div>
+                    </div>
+                    <div>
+                        <span class="status-badge status-${job.Status}">${job.Status}</span>
+                    </div>
+                `;
+                list.appendChild(card);
+            });
+
+            document.getElementById('stats').innerText = `Tracking ${data.length} Applications`;
+
+        } catch (e) {
+            document.getElementById('loading').innerText = "❌ Error loading data. Make sure Deployment is set to 'Anyone'.";
         }
-        loadJobs();
-    </script>
+    }
+
+    loadJobs();
+</script>
+
 </body>
 </html>
