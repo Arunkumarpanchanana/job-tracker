@@ -24,7 +24,7 @@
       color: var(--text);
       font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
       margin: 0;
-      padding: 20px;
+      padding: 24px;
       min-height: 100vh;
     }
     .container { max-width: 800px; margin: 0 auto; }
@@ -52,14 +52,20 @@
 
     .stats-bar {
       display: flex;
-      gap: 16px;
+      gap: 12px;
       margin-bottom: 20px;
       flex-wrap: wrap;
       font-size: 0.85rem;
     }
-    .stats-bar span { background: var(--card); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); }
+    .stats-bar span {
+      background: var(--card);
+      padding: 4px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+    }
     .stat-applied { border-color: var(--applied) !important; }
     .stat-interview { border-color: var(--interview) !important; }
+    .stat-assessment { border-color: var(--assessment) !important; }
     .stat-rejected { border-color: var(--rejected) !important; }
     .stat-offer { border-color: var(--offer) !important; }
 
@@ -76,7 +82,6 @@
       transition: border-color 0.2s, transform 0.15s;
     }
     .job-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-    .job-card.hidden { display: none; }
 
     .job-company { font-weight: 600; font-size: 1.05rem; }
     .job-subject { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
@@ -97,11 +102,16 @@
     .status-Assessment { background: var(--assessment); color: #fff; }
     .status-Rejected { background: var(--rejected); color: #fff; }
     .status-Offer { background: var(--offer); color: #000; }
+    .status-Unknown { background: var(--muted); color: #000; }
 
     #loading, #error { text-align: center; padding: 40px 0; color: var(--muted); }
     #error { color: var(--rejected); }
-    .last-updated { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 32px; }
-    .last-updated a { color: var(--accent); }
+    .last-updated {
+      text-align: center;
+      font-size: 0.78rem;
+      color: var(--muted);
+      margin-top: 32px;
+    }
 
     @media (max-width: 500px) {
       .job-card { flex-direction: column; align-items: flex-start; }
@@ -115,7 +125,7 @@
   <p class="subtitle">Synced from Gmail via Google Apps Script</p>
 
   <div class="controls">
-    <input type="text" id="search" placeholder="Search company…" oninput="render()" />
+    <input type="text" id="search" placeholder="Search company or subject…" oninput="render()" />
     <select id="status-filter" onchange="render()">
       <option value="all">All statuses</option>
       <option value="Applied">Applied</option>
@@ -134,31 +144,28 @@
 </div>
 
 <script>
-  // ── Config ──────────────────────────────────────────────────
   const API_URL = new URLSearchParams(location.search).get('api')
     || 'https://script.google.com/macros/s/AKfycbwC-QAzm0D6oyUYDUzFkTjwtsqD9rEf8dg7uGCZtnvxhcKJj9uJtTSXGhcyDJqysEIQ/exec';
 
   const CACHE_KEY = 'jobtracker_data';
-  const CACHE_AGE = 10 * 60 * 1000; // 10 minutes
+  const CACHE_AGE = 10 * 60 * 1000;
 
-  // ── State ────────────────────────────────────────────────────
   let allJobs = [];
-  let filteredJobs = [];
 
-  // ── Parse date robustly ─────────────────────────────────────
+  function getVal(obj, key) {
+    return obj[key] !== undefined ? obj[key]
+         : obj[key.charAt(0).toUpperCase() + key.slice(1)] !== undefined ? obj[key.charAt(0).toUpperCase() + key.slice(1)]
+         : obj[key.toLowerCase()] !== undefined ? obj[key.toLowerCase()]
+         : obj[key.toUpperCase()] !== undefined ? obj[key.toUpperCase()]
+         : '';
+  }
+
   function parseDate(val) {
     if (!val) return null;
-    // Already a Date object
     if (val instanceof Date && !isNaN(val)) return val;
-    // Google Sheets serial number (days since 1899-12-30)
-    if (typeof val === 'number') {
-      const epoch = new Date(1899, 11, 30);
-      return new Date(epoch.getTime() + val * 86400000);
-    }
-    // ISO string or other string
+    if (typeof val === 'number') return new Date((val - 25569) * 86400 * 1000);
     const d = new Date(val);
     if (!isNaN(d)) return d;
-    // Try parsing "MM/DD/YYYY" etc.
     const m = String(val).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
     if (m) return new Date(+m[3], +m[1] - 1, +m[2]);
     return null;
@@ -166,36 +173,32 @@
 
   function formatDate(val) {
     const d = parseDate(val);
-    if (!d) return '—';
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return d ? d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '\u2014';
   }
 
-  // ── Render cards ────────────────────────────────────────────
   function render() {
     const query = document.getElementById('search').value.toLowerCase().trim();
     const statusFilter = document.getElementById('status-filter').value;
 
-    filteredJobs = allJobs.filter(j => {
-      const company = (j.Company || j.company || '').toLowerCase();
-      const subject = (j.Subject || j.subject || '').toLowerCase();
-      const status = j.Status || j.status || '';
-      const matchesSearch = !query || company.includes(query) || subject.includes(query);
-      const matchesStatus = statusFilter === 'all' || status === statusFilter;
-      return matchesSearch && matchesStatus;
+    const filtered = allJobs.filter(j => {
+      const company = getVal(j, 'company').toLowerCase();
+      const subject = getVal(j, 'subject').toLowerCase();
+      const status = getVal(j, 'status');
+      return (!query || company.includes(query) || subject.includes(query))
+          && (statusFilter === 'all' || status === statusFilter);
     });
 
     const list = document.getElementById('job-list');
-    const loading = document.getElementById('loading');
-    loading.style.display = 'none';
+    document.getElementById('loading').style.display = 'none';
 
-    if (filteredJobs.length === 0) {
+    if (!filtered.length) {
       list.innerHTML = '<p style="text-align:center;color:var(--muted)">No applications match your filters.</p>';
     } else {
-      list.innerHTML = filteredJobs.map(j => {
-        const company = j.Company || j.company || 'Unknown';
-        const subject = j.Subject || j.subject || '';
-        const status = j.Status || j.status || 'Applied';
-        const dateStr = formatDate(j.Date || j.date);
+      list.innerHTML = filtered.map(j => {
+        const company = getVal(j, 'company') || 'Unknown';
+        const subject = getVal(j, 'subject') || '';
+        const status = getVal(j, 'status') || 'Applied';
+        const dateStr = formatDate(getVal(j, 'date'));
         return `
           <div class="job-card">
             <div>
@@ -209,65 +212,55 @@
       }).join('');
     }
 
-    // Update stats bar
     const total = allJobs.length;
-    const applied = allJobs.filter(j => (j.Status || j.status) === 'Applied').length;
-    const interview = allJobs.filter(j => (j.Status || j.status) === 'Interview').length;
-    const rejected = allJobs.filter(j => (j.Status || j.status) === 'Rejected').length;
-    const offers = allJobs.filter(j => (j.Status || j.status) === 'Offer').length;
+    const counts = { Applied: 0, Interview: 0, Assessment: 0, Rejected: 0, Offer: 0 };
+    allJobs.forEach(j => {
+      const s = getVal(j, 'status');
+      if (counts[s] !== undefined) counts[s]++;
+    });
     document.getElementById('stats-bar').innerHTML = `
       <span><strong>${total}</strong> total</span>
-      <span class="stat-applied"><strong>${applied}</strong> Applied</span>
-      <span class="stat-interview"><strong>${interview}</strong> Interview</span>
-      <span class="stat-rejected"><strong>${rejected}</strong> Rejected</span>
-      <span class="stat-offer"><strong>${offers}</strong> Offer</span>
+      <span class="stat-applied"><strong>${counts.Applied}</strong> Applied</span>
+      <span class="stat-interview"><strong>${counts.Interview}</strong> Interview</span>
+      <span class="stat-assessment"><strong>${counts.Assessment}</strong> Assessment</span>
+      <span class="stat-rejected"><strong>${counts.Rejected}</strong> Rejected</span>
+      <span class="stat-offer"><strong>${counts.Offer}</strong> Offer</span>
     `;
   }
 
-  // ── Fetch from cache or network ────────────────────────────
-  function loadFromCache() {
+  function loadCache() {
     try {
       const raw = localStorage.getItem(CACHE_KEY);
       if (!raw) return null;
       const { timestamp, data } = JSON.parse(raw);
-      if (Date.now() - timestamp < CACHE_AGE && Array.isArray(data) && data.length) {
-        return data;
-      }
-      return null;
+      return (Date.now() - timestamp < CACHE_AGE && Array.isArray(data) && data.length) ? data : null;
     } catch { return null; }
   }
 
-  function saveToCache(data) {
-    try {
-      localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data }));
-    } catch { /* quota exceeded — ignore */ }
+  function saveCache(data) {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data })); } catch {}
   }
 
   async function fetchJobs() {
-    const loading = document.getElementById('loading');
-    const error = document.getElementById('error');
-    error.style.display = 'none';
-
-    // Show cache immediately if available
-    const cached = loadFromCache();
+    const cached = loadCache();
     if (cached) {
       allJobs = cached;
       render();
-      document.getElementById('last-updated').innerHTML = 'Showing cached data — refreshing…';
+      document.getElementById('last-updated').textContent = 'Showing cached data \u2014 refreshing\u2026';
     }
 
     try {
       const resp = await fetch(API_URL);
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-      // Normalize keys
+
       allJobs = data.map(j => ({
         Company: j.Company || j.company || 'Unknown',
         Subject: j.Subject || j.subject || '',
         Status: j.Status || j.status || 'Applied',
         Date: j.Date || j.date || null,
       }));
-      // Sort newest first
+
       allJobs.sort((a, b) => {
         const da = parseDate(a.Date), db = parseDate(b.Date);
         if (!da && !db) return 0;
@@ -275,18 +268,18 @@
         if (!db) return -1;
         return db - da;
       });
-      saveToCache(allJobs);
+
+      saveCache(allJobs);
       render();
-      loading.style.display = 'none';
-      const now = new Date().toLocaleString();
-      document.getElementById('last-updated').innerHTML = `Last synced: ${now} | <a href="${API_URL}" target="_blank">View raw data</a>`;
+      document.getElementById('loading').style.display = 'none';
+      document.getElementById('last-updated').textContent = `Last synced: ${new Date().toLocaleString()}`;
+      document.getElementById('error').style.display = 'none';
     } catch (e) {
       if (!cached) {
-        error.style.display = 'block';
-        error.innerHTML = 'Could not load data. Make sure your Apps Script deployment is set to <strong>Anyone</strong>.';
+        document.getElementById('error').style.display = 'block';
+        document.getElementById('error').textContent = 'Could not load data. Make sure your Apps Script deployment is set to Anyone.';
       }
-      loading.style.display = 'none';
-      document.getElementById('last-updated').innerHTML = 'Could not refresh. Showing cached data if available.';
+      document.getElementById('loading').style.display = 'none';
     }
   }
 
