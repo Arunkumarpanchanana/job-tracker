@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>My Job Tracker</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/water.css@2/out/water.css">
+    <style>
+        .status-Applied { color: orange; }
+        .status-Interview { color: cyan; font-weight: bold; }
+        .status-Rejected { color: gray; }
+        .status-Offer { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Live Job Tracker</h1>
+    <div id="loading">Fetching data from Gmail...</div>
+    <table id="job-table" style="display:none;">
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Company</th>
+                <th>Status</th>
+                <th>Subject</th>
+            </tr>
+        </thead>
+        <tbody id="table-body"></tbody>
+    </table>
+
+    <script>
+        // PASTE YOUR GOOGLE WEB APP URL HERE
+        const API_URL = "https://script.google.com/macros/s/AKfycbzHDP5lA6PdM7eo6P8p0FAbZEdQqmh6nB88pnpSX3L7Jlv98oK7m01dOCw944qwnJxR/exec";
+
+        async function loadJobs() {
+            try {
+                const response = await fetch(API_URL);
+                const data = await response.json();
+                const tableBody = document.getElementById('table-body');
+                
+                data.forEach(job => {
+                    const row = `<tr>
+                        <td>${new Date(job.Date).toLocaleDateString()}</td>
+                        <td>${job.Company}</td>
+                        <td class="status-${job.Status}">${job.Status}</td>
+                        <td>${job.Subject}</td>
+                    </tr>`;
+                    tableBody.innerHTML += row;
+                });
+
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('job-table').style.display = 'table';
+            } catch (error) {
+                document.getElementById('loading').innerText = "Error loading data.";
+            }
+        }
+        loadJobs();
+    </script>
+</body>
+</html>
