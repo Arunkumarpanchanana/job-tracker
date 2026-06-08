@@ -77,23 +77,29 @@
             data.sort((a, b) => new Date(b.Date) - new Date(a.Date));
 
             data.forEach(job => {
-                const card = document.createElement('div');
-                card.className = 'job-card';
-                
-                const dateClean = new Date(job.Date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const card = document.createElement('div');
+    card.className = 'job-card';
+    
+    // This finds the data even if the column is named "subject", "Subject", or "SUBJECT"
+    const getVal = (obj, key) => obj[key] || obj[key.toLowerCase()] || obj[key.toUpperCase()] || "";
 
-                card.innerHTML = `
-                    <div class="job-info">
-                        <div class="job-company">${job.Company || 'Unknown'}</div>
-                        <div class="job-subject">${job.Subject || 'No Subject'}</div>
-                        <div class="job-date">📅 ${dateClean}</div>
-                    </div>
-                    <div>
-                        <span class="status-badge status-${job.Status}">${job.Status}</span>
-                    </div>
-                `;
-                list.appendChild(card);
-            });
+    const company = getVal(job, 'Company');
+    const subject = getVal(job, 'Subject');
+    const status = getVal(job, 'Status');
+    const dateStr = new Date(getVal(job, 'Date')).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+
+    card.innerHTML = `
+        <div class="job-info">
+            <div class="job-company">${company || 'New Application'}</div>
+            <div class="job-subject">${subject || 'Application Received'}</div>
+            <div class="job-date">📅 ${dateStr}</div>
+        </div>
+        <div>
+            <span class="status-badge status-${status}">${status}</span>
+        </div>
+    `;
+    list.appendChild(card);
+});
 
             document.getElementById('stats').innerText = `Tracking ${data.length} Applications`;
 
