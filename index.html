@@ -1,115 +1,296 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Job Hunt Dashboard</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/glass.css/glass.css">
-    <style>
-        body { 
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: #fff; min-height: 100vh; padding: 20px;
-        }
-        .container { max-width: 900px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 40px; }
-        
-        .job-card {
-            background: rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(10px);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            transition: transform 0.2s;
-        }
-        .job-card:hover { transform: translateY(-3px); background: rgba(255, 255, 255, 0.15); }
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Job Applications | Arun Kumar Panchanana</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --border: #334155;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --accent: #3b82f6;
+      --applied: #3b82f6;
+      --interview: #f59e0b;
+      --assessment: #8b5cf6;
+      --rejected: #ef4444;
+      --offer: #22c55e;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { font-size: 1.8rem; margin-bottom: 0.25rem; }
+    .subtitle { color: var(--muted); margin-top: 0; font-size: 0.95rem; }
 
-        .job-info { flex: 1; }
-        .job-company { font-size: 1.2rem; font-weight: bold; margin-bottom: 5px; }
-        .job-subject { font-size: 0.9rem; opacity: 0.8; margin-bottom: 10px; }
-        .job-date { font-size: 0.8rem; opacity: 0.6; }
+    .controls {
+      display: flex;
+      gap: 12px;
+      margin: 24px 0;
+      flex-wrap: wrap;
+    }
+    .controls input,
+    .controls select {
+      padding: 10px 14px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--card);
+      color: var(--text);
+      font-size: 0.95rem;
+      flex: 1;
+      min-width: 160px;
+    }
+    .controls select { flex: 0 0 auto; min-width: 120px; }
 
-        .status-badge {
-            padding: 6px 12px;
-            border-radius: 20px;
-            font-size: 0.8rem;
-            font-weight: bold;
-            text-transform: uppercase;
-        }
-        .status-Applied { background: #3498db; }
-        .status-Interview { background: #f1c40f; color: #000; }
-        .status-Rejected { background: #e74c3c; }
-        .status-Offer { background: #2ecc71; }
+    .stats-bar {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+      font-size: 0.85rem;
+    }
+    .stats-bar span { background: var(--card); padding: 4px 12px; border-radius: 20px; border: 1px solid var(--border); }
+    .stat-applied { border-color: var(--applied) !important; }
+    .stat-interview { border-color: var(--interview) !important; }
+    .stat-rejected { border-color: var(--rejected) !important; }
+    .stat-offer { border-color: var(--offer) !important; }
 
-        #loading { text-align: center; font-style: italic; }
-    </style>
+    .job-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .job-card:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .job-card.hidden { display: none; }
+
+    .job-company { font-weight: 600; font-size: 1.05rem; }
+    .job-subject { font-size: 0.85rem; color: var(--muted); margin-top: 2px; }
+    .job-date { font-size: 0.78rem; color: var(--muted); margin-top: 6px; }
+
+    .status-badge {
+      flex-shrink: 0;
+      padding: 4px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+    .status-Applied { background: var(--applied); color: #fff; }
+    .status-Interview { background: var(--interview); color: #000; }
+    .status-Assessment { background: var(--assessment); color: #fff; }
+    .status-Rejected { background: var(--rejected); color: #fff; }
+    .status-Offer { background: var(--offer); color: #000; }
+
+    #loading, #error { text-align: center; padding: 40px 0; color: var(--muted); }
+    #error { color: var(--rejected); }
+    .last-updated { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 32px; }
+    .last-updated a { color: var(--accent); }
+
+    @media (max-width: 500px) {
+      .job-card { flex-direction: column; align-items: flex-start; }
+      .status-badge { align-self: flex-start; }
+    }
+  </style>
 </head>
 <body>
-
 <div class="container">
-    <div class="header">
-        <h1>🚀 Job Application Tracker</h1>
-        <p id="stats">Syncing live from your Gmail...</p>
-    </div>
+  <h1>Job Application Tracker</h1>
+  <p class="subtitle">Synced from Gmail via Google Apps Script</p>
 
-    <div id="loading">Scanning your inbox...</div>
-    <div id="job-list"></div>
+  <div class="controls">
+    <input type="text" id="search" placeholder="Search company…" oninput="render()" />
+    <select id="status-filter" onchange="render()">
+      <option value="all">All statuses</option>
+      <option value="Applied">Applied</option>
+      <option value="Assessment">Assessment</option>
+      <option value="Interview">Interview</option>
+      <option value="Offer">Offer</option>
+      <option value="Rejected">Rejected</option>
+    </select>
+  </div>
+
+  <div class="stats-bar" id="stats-bar"></div>
+  <div id="loading">Loading applications…</div>
+  <div id="job-list"></div>
+  <div id="error" style="display:none"></div>
+  <div class="last-updated" id="last-updated"></div>
 </div>
 
 <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbwC-QAzm0D6oyUYDUzFkTjwtsqD9rEf8dg7uGCZtnvxhcKJj9uJtTSXGhcyDJqysEIQ/exec";
+  // ── Config ──────────────────────────────────────────────────
+  const API_URL = new URLSearchParams(location.search).get('api')
+    || 'https://script.google.com/macros/s/AKfycbwC-QAzm0D6oyUYDUzFkTjwtsqD9rEf8dg7uGCZtnvxhcKJj9uJtTSXGhcyDJqysEIQ/exec';
 
-    async function loadJobs() {
-        try {
-            const response = await fetch(API_URL);
-            const data = await response.json();
-            const list = document.getElementById('job-list');
-            const loading = document.getElementById('loading');
-            
-            loading.style.display = 'none';
-            list.innerHTML = '';
+  const CACHE_KEY = 'jobtracker_data';
+  const CACHE_AGE = 10 * 60 * 1000; // 10 minutes
 
-            // Sort newest first
-            data.sort((a, b) => new Date(b.Date) - new Date(a.Date));
+  // ── State ────────────────────────────────────────────────────
+  let allJobs = [];
+  let filteredJobs = [];
 
-            data.forEach(job => {
-    const card = document.createElement('div');
-    card.className = 'job-card';
-    
-    // This finds the data even if the column is named "subject", "Subject", or "SUBJECT"
-    const getVal = (obj, key) => obj[key] || obj[key.toLowerCase()] || obj[key.toUpperCase()] || "";
+  // ── Parse date robustly ─────────────────────────────────────
+  function parseDate(val) {
+    if (!val) return null;
+    // Already a Date object
+    if (val instanceof Date && !isNaN(val)) return val;
+    // Google Sheets serial number (days since 1899-12-30)
+    if (typeof val === 'number') {
+      const epoch = new Date(1899, 11, 30);
+      return new Date(epoch.getTime() + val * 86400000);
+    }
+    // ISO string or other string
+    const d = new Date(val);
+    if (!isNaN(d)) return d;
+    // Try parsing "MM/DD/YYYY" etc.
+    const m = String(val).match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (m) return new Date(+m[3], +m[1] - 1, +m[2]);
+    return null;
+  }
 
-    const company = getVal(job, 'Company');
-    const subject = getVal(job, 'Subject');
-    const status = getVal(job, 'Status');
-    const dateStr = new Date(getVal(job, 'Date')).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  function formatDate(val) {
+    const d = parseDate(val);
+    if (!d) return '—';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  }
 
-    card.innerHTML = `
-        <div class="job-info">
-            <div class="job-company">${company || 'New Application'}</div>
-            <div class="job-subject">${subject || 'Application Received'}</div>
-            <div class="job-date">📅 ${dateStr}</div>
-        </div>
-        <div>
+  // ── Render cards ────────────────────────────────────────────
+  function render() {
+    const query = document.getElementById('search').value.toLowerCase().trim();
+    const statusFilter = document.getElementById('status-filter').value;
+
+    filteredJobs = allJobs.filter(j => {
+      const company = (j.Company || j.company || '').toLowerCase();
+      const subject = (j.Subject || j.subject || '').toLowerCase();
+      const status = j.Status || j.status || '';
+      const matchesSearch = !query || company.includes(query) || subject.includes(query);
+      const matchesStatus = statusFilter === 'all' || status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+
+    const list = document.getElementById('job-list');
+    const loading = document.getElementById('loading');
+    loading.style.display = 'none';
+
+    if (filteredJobs.length === 0) {
+      list.innerHTML = '<p style="text-align:center;color:var(--muted)">No applications match your filters.</p>';
+    } else {
+      list.innerHTML = filteredJobs.map(j => {
+        const company = j.Company || j.company || 'Unknown';
+        const subject = j.Subject || j.subject || '';
+        const status = j.Status || j.status || 'Applied';
+        const dateStr = formatDate(j.Date || j.date);
+        return `
+          <div class="job-card">
+            <div>
+              <div class="job-company">${company}</div>
+              <div class="job-subject">${subject}</div>
+              <div class="job-date">${dateStr}</div>
+            </div>
             <span class="status-badge status-${status}">${status}</span>
-        </div>
-    `;
-    list.appendChild(card);
-});
-
-            document.getElementById('stats').innerText = `Tracking ${data.length} Applications`;
-
-        } catch (e) {
-            document.getElementById('loading').innerText = "❌ Error loading data. Make sure Deployment is set to 'Anyone'.";
-        }
+          </div>
+        `;
+      }).join('');
     }
 
-    loadJobs();
-</script>
+    // Update stats bar
+    const total = allJobs.length;
+    const applied = allJobs.filter(j => (j.Status || j.status) === 'Applied').length;
+    const interview = allJobs.filter(j => (j.Status || j.status) === 'Interview').length;
+    const rejected = allJobs.filter(j => (j.Status || j.status) === 'Rejected').length;
+    const offers = allJobs.filter(j => (j.Status || j.status) === 'Offer').length;
+    document.getElementById('stats-bar').innerHTML = `
+      <span><strong>${total}</strong> total</span>
+      <span class="stat-applied"><strong>${applied}</strong> Applied</span>
+      <span class="stat-interview"><strong>${interview}</strong> Interview</span>
+      <span class="stat-rejected"><strong>${rejected}</strong> Rejected</span>
+      <span class="stat-offer"><strong>${offers}</strong> Offer</span>
+    `;
+  }
 
+  // ── Fetch from cache or network ────────────────────────────
+  function loadFromCache() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY);
+      if (!raw) return null;
+      const { timestamp, data } = JSON.parse(raw);
+      if (Date.now() - timestamp < CACHE_AGE && Array.isArray(data) && data.length) {
+        return data;
+      }
+      return null;
+    } catch { return null; }
+  }
+
+  function saveToCache(data) {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), data }));
+    } catch { /* quota exceeded — ignore */ }
+  }
+
+  async function fetchJobs() {
+    const loading = document.getElementById('loading');
+    const error = document.getElementById('error');
+    error.style.display = 'none';
+
+    // Show cache immediately if available
+    const cached = loadFromCache();
+    if (cached) {
+      allJobs = cached;
+      render();
+      document.getElementById('last-updated').innerHTML = 'Showing cached data — refreshing…';
+    }
+
+    try {
+      const resp = await fetch(API_URL);
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      // Normalize keys
+      allJobs = data.map(j => ({
+        Company: j.Company || j.company || 'Unknown',
+        Subject: j.Subject || j.subject || '',
+        Status: j.Status || j.status || 'Applied',
+        Date: j.Date || j.date || null,
+      }));
+      // Sort newest first
+      allJobs.sort((a, b) => {
+        const da = parseDate(a.Date), db = parseDate(b.Date);
+        if (!da && !db) return 0;
+        if (!da) return 1;
+        if (!db) return -1;
+        return db - da;
+      });
+      saveToCache(allJobs);
+      render();
+      loading.style.display = 'none';
+      const now = new Date().toLocaleString();
+      document.getElementById('last-updated').innerHTML = `Last synced: ${now} | <a href="${API_URL}" target="_blank">View raw data</a>`;
+    } catch (e) {
+      if (!cached) {
+        error.style.display = 'block';
+        error.innerHTML = 'Could not load data. Make sure your Apps Script deployment is set to <strong>Anyone</strong>.';
+      }
+      loading.style.display = 'none';
+      document.getElementById('last-updated').innerHTML = 'Could not refresh. Showing cached data if available.';
+    }
+  }
+
+  fetchJobs();
+</script>
 </body>
 </html>
